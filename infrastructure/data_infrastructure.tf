@@ -109,3 +109,77 @@ resource "databricks_catalog" "unity_catalog" {
     azurerm_storage_container.storage.name,
   azurerm_storage_account.storage.name)
 }
+
+resource "databricks_cluster" "compute" {
+  cluster_name            = azurecaf_name.databricks_cluster.result
+  spark_version           = "14.3.x-scala2.12"
+  node_type_id            = "Standard_F4s"
+  autotermination_minutes = 15
+
+  spark_env_vars = {
+    "HOST_PATH" : azurerm_databricks_workspace.databricks.workspace_url
+  }
+
+  spark_conf = {
+    "spark.databricks.pyspark.enableProcessIsolation" : "false"
+  }
+
+  azure_attributes {
+    availability = "ON_DEMAND_AZURE"
+  }
+
+  autoscale {
+    min_workers = 1
+    max_workers = 2
+  }
+}
+
+resource "databricks_job" "job" {
+  name        = "fsm_job"
+
+  email_notifications {
+    on_failure = var.team_emails
+  }
+  git_source {
+    url      = "https://github.com/rafaelamilagres/satalia-data-engineering-test.git"
+    provider = "gitHub"
+    branch   = "main"
+  }
+  # task {
+  #   task_key            = "dbt"
+  #   existing_cluster_id = databricks_cluster.compute.id
+  #   library {
+  #     pypi {
+  #       package = "dbt-databricks==1.7.9"
+  #     }
+  #   }
+
+  #   dbt_task {
+  #     commands          = ["dbt run --select dlh_models"]
+  #     source = "GIT"
+  #     project_directory = "project/dbt"
+  #   }
+  #   depends_on {
+  #     task_key = "ingestion"
+  #   }
+  # }
+  task {
+    task_key            = "ingestion"
+    existing_cluster_id = databricks_cluster.compute.id
+    notebook_task {
+      notebook_path = "project/notebooks/ingestion"
+    }
+  }
+
+  trigger {
+    pause_status = "UNPAUSED"
+    file_arrival {
+      url = format("abfss://%s@%s.dfs.core.windows.net/%s/",
+        azurerm_storage_container.storage.name,
+        azurerm_storage_account.storage.name,
+        "source")
+      min_time_between_triggers_seconds = 120
+      wait_after_last_change_seconds = 120
+    }
+  }
+}
