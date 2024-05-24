@@ -162,10 +162,21 @@ resource "databricks_job" "job" {
   }
   
   task {
-    task_key            = "ingestion"
+    task_key            = "process"
     existing_cluster_id = databricks_cluster.compute.id
     notebook_task {
-      notebook_path = "project/notebooks/ingestion"
+      notebook_path = "project/notebooks/01.process"
+    }
+    depends_on {
+      task_key = "setup"
+    }
+  }
+  
+  task {
+    task_key            = "setup"
+    existing_cluster_id = databricks_cluster.compute.id
+    notebook_task {
+      notebook_path = "project/notebooks/00.setup"
     }
   }
 
