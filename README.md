@@ -1,4 +1,4 @@
-# Project Title
+# Data engineering infrastructure to process FSM data
 
 ## Overview
 This project contains Terraform scripts to provision a data infrastructure on Azure. The scripts are designed to be run locally, using the Azure CLI for authentication.
