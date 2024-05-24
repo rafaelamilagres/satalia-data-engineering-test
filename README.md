@@ -3,6 +3,8 @@
 ## Overview
 This project contains Terraform scripts to provision a data infrastructure on Azure. The scripts are designed to be run locally, using the Azure CLI for authentication.
 
+The architecture comprises Databricks (Spark clusters, SQL Endpoint, and Unity Catalog), Azure Data Lake Gen 2, and Azure Key Vault. The file arrival trigger was implemented using Databricks jobs, which runs a pipeline that sets up the environment (creates and refreshes tables as needed) and processes all the data. All Databricks resources were implemented using the Terraform Databricks provider, with the exception of tables.
+
 ## Prerequisites
 1. [Terraform](https://www.terraform.io/downloads.html) installed on your local machine.
 2. [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed on your local machine.
