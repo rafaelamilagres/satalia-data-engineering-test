@@ -110,6 +110,21 @@ resource "databricks_catalog" "unity_catalog" {
   azurerm_storage_account.storage.name)
 }
 
+resource "databricks_schema" "unity_catalog_landing" {
+  catalog_name = databricks_catalog.unity_catalog.id
+  name = "landing"
+}
+
+resource "databricks_schema" "unity_catalog_raw" {
+  catalog_name = databricks_catalog.unity_catalog.id
+  name = "raw"
+}
+
+resource "databricks_schema" "unity_catalog_processed" {
+  catalog_name = databricks_catalog.unity_catalog.id
+  name = "processed"
+}
+
 resource "databricks_cluster" "compute" {
   cluster_name            = azurecaf_name.databricks_cluster.result
   spark_version           = "14.3.x-scala2.12"
@@ -145,24 +160,7 @@ resource "databricks_job" "job" {
     provider = "gitHub"
     branch   = "main"
   }
-  # task {
-  #   task_key            = "dbt"
-  #   existing_cluster_id = databricks_cluster.compute.id
-  #   library {
-  #     pypi {
-  #       package = "dbt-databricks==1.7.9"
-  #     }
-  #   }
-
-  #   dbt_task {
-  #     commands          = ["dbt run --select dlh_models"]
-  #     source = "GIT"
-  #     project_directory = "project/dbt"
-  #   }
-  #   depends_on {
-  #     task_key = "ingestion"
-  #   }
-  # }
+  
   task {
     task_key            = "ingestion"
     existing_cluster_id = databricks_cluster.compute.id
@@ -172,14 +170,22 @@ resource "databricks_job" "job" {
   }
 
   trigger {
-    pause_status = "UNPAUSED"
+    pause_status = "PAUSED"
     file_arrival {
       url = format("abfss://%s@%s.dfs.core.windows.net/%s/",
         azurerm_storage_container.storage.name,
         azurerm_storage_account.storage.name,
-        "source")
-      min_time_between_triggers_seconds = 120
-      wait_after_last_change_seconds = 120
+        "landing/visits")
+      min_time_between_triggers_seconds = 61
+      wait_after_last_change_seconds = 61
     }
   }
+}
+
+resource "databricks_sql_endpoint" "compute" {
+  name             = "SQL FSM Endpoint"
+  cluster_size     = "2X-Small"
+  max_num_clusters = 1
+
+  enable_serverless_compute = true
 }
