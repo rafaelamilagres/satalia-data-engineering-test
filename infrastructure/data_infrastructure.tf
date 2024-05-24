@@ -46,12 +46,7 @@ resource "azurerm_key_vault_secret" "storage" {
   name         = "fsm-storage-access-key"
   value        = azurerm_storage_account.storage.primary_access_key
   key_vault_id = azurerm_key_vault.vault.id
-
-  depends_on = [
-    azurerm_role_assignment.storage
-  ]
 }
-
 
 resource "azurerm_databricks_workspace" "databricks" {
   name                = azurecaf_name.databricks_workspace.result
@@ -68,7 +63,6 @@ resource "azurerm_role_assignment" "databricks" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
-
 resource "databricks_secret_scope" "databricks_secrets" {
   name = "fsm-secret-scope"
 
@@ -76,4 +70,42 @@ resource "databricks_secret_scope" "databricks_secrets" {
     resource_id = azurerm_key_vault.vault.id
     dns_name    = azurerm_key_vault.vault.vault_uri
   }
+}
+
+resource "azurerm_databricks_access_connector" "storage" {
+  name                = "ext-databricks-mi"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+resource "azurerm_role_assignment" "storage_access_mi" {
+  scope                = azurerm_storage_account.storage.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_databricks_access_connector.storage.identity[0].principal_id
+}
+
+resource "databricks_storage_credential" "storage" {
+  name = azurerm_databricks_access_connector.storage.name
+  azure_managed_identity {
+    access_connector_id = azurerm_databricks_access_connector.storage.id
+  }
+}
+
+resource "databricks_external_location" "storage" {
+  name = "external"
+  url = format("abfss://%s@%s.dfs.core.windows.net",
+    azurerm_storage_container.storage.name,
+  azurerm_storage_account.storage.name)
+
+  credential_name = databricks_storage_credential.storage.id
+}
+
+resource "databricks_catalog" "unity_catalog" {
+  name = "fsm"
+  storage_root = format("abfss://%s@%s.dfs.core.windows.net",
+    azurerm_storage_container.storage.name,
+  azurerm_storage_account.storage.name)
 }
