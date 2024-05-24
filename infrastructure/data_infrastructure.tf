@@ -170,7 +170,7 @@ resource "databricks_job" "job" {
   }
 
   trigger {
-    pause_status = "PAUSED"
+    pause_status = "UNPAUSED"
     file_arrival {
       url = format("abfss://%s@%s.dfs.core.windows.net/%s/",
         azurerm_storage_container.storage.name,
